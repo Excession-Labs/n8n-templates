@@ -22,3 +22,35 @@ Limits: the checker reads response headers only. It checks public http and https
 Categories (pick the closest in the n8n form): IT Ops, Engineering
 Tags / nodes used: Schedule Trigger, Manual Trigger, Edit Fields (Set), Split Out, Loop Over Items, HTTP Request, Wait, Code, If, Send Email, NoOp
 Creator bio (from FACTS.md): Excession Labs is a security lab. It runs authorized security tests of web applications, APIs, multi-tenant SaaS platforms and AI applications, and it publishes lab research.
+
+---
+
+# Listing text: Pentest provider shortlist from PentestCompare data
+
+Title (53 characters):
+Pentest provider shortlist from PentestCompare data
+
+Short description (plain text):
+Enter a delivery model, a scope and a prices filter. The workflow reads the open PentestCompare provider dataset and returns a table of matching pentest providers with sourced facts and check dates.
+
+Long description:
+This workflow helps a buyer make a first list of penetration test providers. You enter three needs: the delivery model (any, human-led, hybrid or automated), the scope (web_app, api, ai_apps, cloud, network or mobile) and whether to keep only providers with published prices. The workflow downloads the open provider dataset from pentestcompare.com (CC BY 4.0, no key) and filters it in a Code node. The result is a Markdown table. Each row has the provider's delivery model, scope status, pricing model, first published price, turnaround claim, retesting claim, sample report status, source link and the date the provider was last checked. Rows are sorted by name, not ranked. The publisher of the dataset has its own row, marked publisher_owned. Credit PentestCompare when you share the result. Setup: no credentials needed. Edit the three values in the node "Buyer needs", or use the form trigger.
+
+Categories (pick the closest in the n8n form): Security, IT Ops
+Tags / nodes used: Manual Trigger, Form Trigger, Edit Fields (Set), NoOp, HTTP Request, Code
+
+---
+
+# Listing text: Track CISA KEV additions ranked by EPSS
+
+Title (42 characters):
+Track CISA KEV additions ranked by EPSS
+
+Short description (plain text):
+Every week, find the new entries in the CISA Known Exploited Vulnerabilities catalog, add their FIRST EPSS scores, and send a ranked digest with NVD links.
+
+Long description:
+This workflow sends a weekly digest of new entries in the CISA Known Exploited Vulnerabilities (KEV) catalog. It downloads the KEV JSON feed, compares it with the catalog version and CVE IDs that n8n saved on the last run, and gets the EPSS score of each new CVE from the free FIRST API. The digest lists the entries from the highest EPSS score to the lowest, with vendor, product, date added, CISA due date, known ransomware use and a link to the NVD. If nothing is new, the run ends in a NoOp node. Setup: select an SMTP credential in the email node and set the From and To addresses. You can use a Slack node instead. No API key and no external cost. Limit: n8n saves the state only for runs started by the Schedule Trigger in an active workflow. EPSS estimates the chance of exploitation. It does not measure impact in your systems.
+
+Categories (pick the closest in the n8n form): Security, IT Ops
+Tags / nodes used: Schedule Trigger, Manual Trigger, HTTP Request, Code, If, Split Out, Send Email, NoOp

@@ -1,0 +1,389 @@
+{
+  "name": "Track CISA KEV additions ranked by EPSS",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Track CISA KEV additions, ranked by EPSS\n**Who it helps:** a security or IT team that wants one weekly message with the new entries in the CISA Known Exploited Vulnerabilities (KEV) catalog, ranked by exploit probability.\n\n**How it works**\n1. A Schedule Trigger starts the workflow every Monday at 08:00. The Manual Trigger is for testing.\n2. The workflow downloads the KEV JSON feed from cisa.gov.\n3. \"Find new entries\" compares it with the data n8n saved on the last run (n8n workflow static data: the catalog version and the CVE IDs already reported).\n4. The new CVE IDs go to the FIRST EPSS API (free, no key), 50 IDs per request.\n5. \"Rank and digest\" sorts the entries by EPSS score and writes the digest with an NVD link for each CVE.\n6. If there are new entries, an email is sent. If not, the run ends in a NoOp node.\n\n**Setup**\n1. Open \"Send digest email\". Pick your SMTP credential and set the From and To addresses. Or replace it with a Slack node.\n2. Click Execute workflow once to test, then activate the workflow.\n\n**Static data limit:** n8n saves static data only for runs started by the Schedule Trigger in an active workflow. A manual test run shows the result but does not save the state.\n\n**First run:** with no saved state, the workflow reports the entries added in the last 7 days. Change `FIRST_RUN_DAYS` in \"Find new entries\" to change this.\n\n**Good to know:** a very new CVE may have no EPSS score yet. It is listed last as \"not scored yet\". If a run fails before the digest step, the state is not saved and the next run reports the same entries again.",
+        "height": 760,
+        "width": 560,
+        "color": 4
+      },
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -760,
+        -120
+      ],
+      "id": "overview"
+    },
+    {
+      "parameters": {
+        "content": "### 1. Feed and state\nThe feed is a single JSON file with all entries. \"Find new entries\" keeps the catalog version and the CVE IDs in static data. It marks an entry as new when its ID is not in the saved list.",
+        "height": 300,
+        "width": 520,
+        "color": 7
+      },
+      "name": "Note fetch",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -40
+      ],
+      "id": "note-fetch"
+    },
+    {
+      "parameters": {
+        "content": "### 2. EPSS scores\n\"Split EPSS requests\" makes one item per group of 50 CVE IDs. The FIRST API returns the score and the percentile for each ID. The Wait node pauses 1 second between requests.",
+        "height": 300,
+        "width": 700,
+        "color": 7
+      },
+      "name": "Note epss",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        400,
+        -40
+      ],
+      "id": "note-epss"
+    },
+    {
+      "parameters": {
+        "content": "### 3. Digest\n\"Rank and digest\" sorts by EPSS and builds the text. Add SMTP credentials in n8n (Credentials, then SMTP). Do not type passwords into node fields.",
+        "height": 300,
+        "width": 760,
+        "color": 7
+      },
+      "name": "Note digest",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1140,
+        -40
+      ],
+      "id": "note-digest"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        240
+      ],
+      "id": "schedule-trigger"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        420
+      ],
+      "id": "manual-trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json",
+        "options": {
+          "timeout": 60000
+        }
+      },
+      "name": "Get KEV catalog",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        80,
+        320
+      ],
+      "id": "get-kev-catalog"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Remember the last catalog version and the CVE IDs already reported.\nconst sd = $getWorkflowStaticData('global');\nconst cat = $input.first().json;\nconst vulns = Array.isArray(cat.vulnerabilities) ? cat.vulnerabilities : [];\nconst version = cat.catalogVersion;\nconst FIRST_RUN_DAYS = 7; // first run only: report entries added in the last 7 days\nconst known = new Set(sd.knownIds || []);\nlet fresh;\nif (sd.catalogVersion === undefined) {\n  const cutoff = new Date(Date.now() - FIRST_RUN_DAYS * 86400000).toISOString().slice(0, 10);\n  fresh = vulns.filter(v => v.dateAdded >= cutoff);\n} else if (sd.catalogVersion === version) {\n  fresh = [];\n} else {\n  fresh = vulns.filter(v => !known.has(v.cveID));\n}\nconst chunks = [];\nfor (let i = 0; i < fresh.length; i += 50) chunks.push(fresh.slice(i, i + 50).map(v => v.cveID).join(','));\nreturn [{ json: {\n  hasNew: fresh.length > 0,\n  catalogVersion: version,\n  previousVersion: sd.catalogVersion || null,\n  catalogCount: vulns.length,\n  newCount: fresh.length,\n  newEntries: fresh,\n  allIds: vulns.map(v => v.cveID),\n  epssChunks: chunks,\n} }];"
+      },
+      "name": "Find new entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        320
+      ],
+      "id": "find-new-entries"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.hasNew }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Any new entries?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        520,
+        320
+      ],
+      "id": "any-new-entries"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "epssChunks",
+        "include": "noOtherFields",
+        "options": {
+          "destinationFieldName": "cves"
+        }
+      },
+      "name": "Split EPSS requests",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        760,
+        240
+      ],
+      "id": "split-epss-requests"
+    },
+    {
+      "parameters": {
+        "url": "https://api.first.org/data/v1/epss",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "cve",
+              "value": "={{ $json.cves }}"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 30000,
+          "batching": {
+            "batch": {
+              "batchSize": 1,
+              "batchInterval": 1000
+            }
+          }
+        }
+      },
+      "name": "Get EPSS scores",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        980,
+        240
+      ],
+      "id": "get-epss-scores"
+    },
+    {
+      "parameters": {
+        "jsCode": "const prev = $('Find new entries').first().json;\nconst scores = {};\nlet scoreDate = null;\nfor (const item of $input.all()) {\n  for (const d of (item.json.data || [])) { scores[d.cve] = d; scoreDate = d.date; }\n}\nconst rows = prev.newEntries.map(v => {\n  const s = scores[v.cveID];\n  return {\n    cve: v.cveID, vendor: v.vendorProject, product: v.product, name: v.vulnerabilityName,\n    date_added: v.dateAdded, due_date: v.dueDate, ransomware: v.knownRansomwareCampaignUse,\n    epss: s ? parseFloat(s.epss) : null, percentile: s ? parseFloat(s.percentile) : null,\n    nvd: 'https://nvd.nist.gov/vuln/detail/' + v.cveID,\n  };\n});\nrows.sort((a, b) => (b.epss === null ? -1 : b.epss) - (a.epss === null ? -1 : a.epss));\nconst pct = x => x === null ? 'not scored yet' : (x * 100).toFixed(2) + '%';\nconst lines = rows.map((r, i) => (i + 1) + '. ' + r.cve + '  EPSS ' + pct(r.epss) + (r.percentile === null ? '' : ' (percentile ' + (r.percentile * 100).toFixed(1) + ')') + '\\n   ' + r.vendor + ' ' + r.product + ': ' + r.name + '\\n   Added ' + r.date_added + ', CISA due date ' + r.due_date + ', known ransomware use: ' + r.ransomware + '\\n   ' + r.nvd);\nconst text = 'CISA KEV additions since the last run: ' + rows.length + ' (catalog ' + prev.catalogVersion + ', was ' + (prev.previousVersion || 'none') + ')\\nRanked by FIRST EPSS score' + (scoreDate ? ' of ' + scoreDate : '') + ', highest first. EPSS is the estimated probability of exploitation in the next 30 days.\\n\\n' + lines.join('\\n\\n') + '\\n\\nSources: https://www.cisa.gov/known-exploited-vulnerabilities-catalog and https://www.first.org/epss/';\n// Save state only after every step before this node worked.\nconst sd = $getWorkflowStaticData('global');\nsd.catalogVersion = prev.catalogVersion;\nsd.knownIds = prev.allIds;\nsd.lastRun = new Date().toISOString();\nreturn [{ json: { count: rows.length, catalogVersion: prev.catalogVersion, epssDate: scoreDate, subject: 'CISA KEV: ' + rows.length + ' new, top EPSS ' + pct(rows[0] ? rows[0].epss : null), text, rows } }];",
+        "mode": "runOnceForAllItems"
+      },
+      "name": "Rank and digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        240
+      ],
+      "id": "rank-and-digest"
+    },
+    {
+      "parameters": {
+        "fromEmail": "alerts@your-domain.example",
+        "toEmail": "you@your-domain.example",
+        "subject": "={{ $json.subject }}",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "name": "Send digest email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1420,
+        160
+      ],
+      "id": "send-digest-email",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account (replace)"
+        }
+      },
+      "disabled": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const sd = $getWorkflowStaticData('global');\nconst prev = $json;\nsd.catalogVersion = prev.catalogVersion;\nsd.knownIds = prev.allIds;\nsd.lastRun = new Date().toISOString();\nreturn [{ json: { message: 'No new KEV entries. Catalog version ' + prev.catalogVersion, catalogVersion: prev.catalogVersion } }];"
+      },
+      "name": "Save state, no new entries",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        440
+      ],
+      "id": "save-state-no-new-entries"
+    },
+    {
+      "parameters": {},
+      "name": "No new entries, nothing to send",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        980,
+        440
+      ],
+      "id": "no-new-entries-nothing-to-send"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get KEV catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get KEV catalog",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get KEV catalog": {
+      "main": [
+        [
+          {
+            "node": "Find new entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find new entries": {
+      "main": [
+        [
+          {
+            "node": "Any new entries?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any new entries?": {
+      "main": [
+        [
+          {
+            "node": "Split EPSS requests",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Save state, no new entries",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split EPSS requests": {
+      "main": [
+        [
+          {
+            "node": "Get EPSS scores",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get EPSS scores": {
+      "main": [
+        [
+          {
+            "node": "Rank and digest",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Rank and digest": {
+      "main": [
+        [
+          {
+            "node": "Send digest email",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Save state, no new entries": {
+      "main": [
+        [
+          {
+            "node": "No new entries, nothing to send",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "id": "kevtest1"
+}

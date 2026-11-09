@@ -1,0 +1,402 @@
+{
+  "name": "Weekly security headers check for your websites",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Weekly security headers check for your websites\n**Who it helps:** anyone who runs a few public websites and wants a weekly look at their HTTP security headers.\n\n**How it works**\n1. A Schedule Trigger starts the workflow every Monday at 08:00 (a Manual Trigger lets you test it).\n2. The node \"Websites to check\" holds your list of URLs.\n3. The workflow checks one URL at a time with the free checker at penetrationtestservices.com and waits 6 seconds after each call. The checker allows 12 requests per minute per IP address.\n4. The node \"Build summary\" reads the results.\n5. If at least one site has a check with the status \"fail\", the workflow sends an email. Otherwise it ends in a NoOp node.\n\n**Setup**\n1. Open \"Websites to check\" and replace the example URLs with your own.\n2. Open \"Send alert email\" and pick your SMTP credential. Set the From and To addresses.\n3. Optional: replace the email node with a Slack node and connect it to the same input.\n4. Click \"Execute workflow\" to test, then activate the workflow.\n\n**Costs and limits:** no API key and no external cost. The checker sends a GET request to each URL and reads response headers only. It checks public http and https addresses on the default ports. Do not list more than about 10 URLs per run.",
+        "height": 640,
+        "width": 520,
+        "color": 4
+      },
+      "name": "Overview",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -720,
+        -80
+      ],
+      "id": "overview"
+    },
+    {
+      "parameters": {
+        "content": "### 1. Trigger and URL list\nThe Schedule Trigger runs weekly. Change day and time in the node. The Manual Trigger is for testing. Edit the `urls` list in \"Websites to check\" (one address per entry, with https://).",
+        "height": 300,
+        "width": 420,
+        "color": 7
+      },
+      "name": "Note trigger",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        -40
+      ],
+      "id": "note-trigger"
+    },
+    {
+      "parameters": {
+        "content": "### 2. One check at a time\n\"Loop Over Items\" sends one URL per round to the HTTP Request. The Wait node pauses 6 seconds before the next URL. This keeps the run under the limit of 12 checks per minute per IP address. A site that cannot be checked returns an error message and does not stop the run.",
+        "height": 300,
+        "width": 740,
+        "color": 7
+      },
+      "name": "Note checks",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        300,
+        -40
+      ],
+      "id": "note-checks"
+    },
+    {
+      "parameters": {
+        "content": "### 3. Summary and alert\n\"Build summary\" counts pass, warn and fail results for each site. The IF node sends the email only when at least one site has a \"fail\" result. Add SMTP credentials in n8n (Credentials, then SMTP). Do not type passwords into node fields.",
+        "height": 300,
+        "width": 700,
+        "color": 7
+      },
+      "name": "Note alert",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        1080,
+        -40
+      ],
+      "id": "note-alert"
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 8
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -160,
+        240
+      ],
+      "id": "schedule-trigger"
+    },
+    {
+      "parameters": {},
+      "name": "Manual Trigger",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -160,
+        420
+      ],
+      "id": "manual-trigger"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "a1",
+              "name": "urls",
+              "type": "array",
+              "value": "=[\"https://example.com\",\"https://example.org\"]"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "name": "Websites to check",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        80,
+        320
+      ],
+      "id": "websites-to-check"
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "urls",
+        "include": "noOtherFields",
+        "options": {
+          "destinationFieldName": "url"
+        }
+      },
+      "name": "Split URLs",
+      "type": "n8n-nodes-base.splitOut",
+      "typeVersion": 1,
+      "position": [
+        300,
+        320
+      ],
+      "id": "split-urls"
+    },
+    {
+      "parameters": {
+        "batchSize": 1,
+        "options": {}
+      },
+      "name": "Loop Over Items",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        520,
+        320
+      ],
+      "id": "loop-over-items"
+    },
+    {
+      "parameters": {
+        "url": "https://penetrationtestservices.com/api/check-headers",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "url",
+              "value": "={{ $json.url }}"
+            }
+          ]
+        },
+        "options": {
+          "response": {
+            "response": {
+              "neverError": true
+            }
+          },
+          "timeout": 30000
+        }
+      },
+      "name": "Check headers",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        760,
+        420
+      ],
+      "id": "check-headers"
+    },
+    {
+      "parameters": {
+        "amount": 6,
+        "unit": "seconds"
+      },
+      "name": "Wait 6 seconds",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        980,
+        420
+      ],
+      "id": "wait-6-seconds",
+      "webhookId": "b7c1e0aa-6a5e-4c35-9f44-2f1a0d6c7e10"
+    },
+    {
+      "parameters": {
+        "jsCode": "const urls = $('Split URLs').all().map(i => i.json.url);\nconst results = $input.all().map((item, idx) => ({ url: urls[idx] || '', r: item.json }));\nconst sites = results.map(({ url, r }) => {\n  if (!r || r.ok !== true) {\n    return { url: r && r.checked_url || url, error: (r && r.error) || 'No result', fail: 0, warn: 0, pass: 0, failing: [] };\n  }\n  const failing = (r.checks || []).filter(c => c.status === 'fail').map(c => c.name);\n  return { url: r.final_url || r.checked_url, error: null, fail: r.summary.fail, warn: r.summary.warn, pass: r.summary.pass, failing };\n});\nconst withFail = sites.filter(s => s.fail > 0);\nconst lines = sites.map(s => s.error\n  ? `${s.url}: could not be checked (${s.error})`\n  : `${s.url}: ${s.fail} fail, ${s.warn} warn, ${s.pass} pass` + (s.failing.length ? `\\n  Failing: ${s.failing.join(', ')}` : ''));\nconst text = `Weekly security headers check\\n\\n${lines.join('\\n')}\\n\\nFull report for any site: https://penetrationtestservices.com/tools/security-headers-checker/`;\nreturn [{ json: { hasFail: withFail.length > 0, failCount: withFail.length, checked: sites.length, text, sites } }];"
+      },
+      "name": "Build summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        760,
+        220
+      ],
+      "id": "build-summary"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "c1",
+              "leftValue": "={{ $json.hasFail }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "name": "Any site with a fail?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1100,
+        220
+      ],
+      "id": "any-site-with-a-fail?"
+    },
+    {
+      "parameters": {
+        "fromEmail": "alerts@your-domain.example",
+        "toEmail": "you@your-domain.example",
+        "subject": "=Security headers: {{ $json.failCount }} of {{ $json.checked }} sites have a fail",
+        "emailFormat": "text",
+        "text": "={{ $json.text }}",
+        "options": {}
+      },
+      "name": "Send alert email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2.1,
+      "position": [
+        1360,
+        140
+      ],
+      "id": "send-alert-email",
+      "credentials": {
+        "smtp": {
+          "id": "REPLACE_ME",
+          "name": "SMTP account (replace)"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "name": "All clear, no alert",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1360,
+        340
+      ],
+      "id": "all-clear,-no-alert"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Websites to check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Manual Trigger": {
+      "main": [
+        [
+          {
+            "node": "Websites to check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Websites to check": {
+      "main": [
+        [
+          {
+            "node": "Split URLs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split URLs": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [
+          {
+            "node": "Build summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check headers",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check headers": {
+      "main": [
+        [
+          {
+            "node": "Wait 6 seconds",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait 6 seconds": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Build summary": {
+      "main": [
+        [
+          {
+            "node": "Any site with a fail?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Any site with a fail?": {
+      "main": [
+        [
+          {
+            "node": "Send alert email",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "All clear, no alert",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {}
+}

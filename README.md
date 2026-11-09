@@ -46,7 +46,7 @@ Listing text for the n8n template library is in [LISTING.md](LISTING.md).
 
 ## Pentest provider shortlist from PentestCompare data
 
-The workflow turns three buyer needs into a table of matching penetration test providers. It reads the open dataset at https://pentestcompare.com/data/providers.json (CC BY 4.0, no key). Each row carries the provider's sourced facts, a source link and the date the provider was last checked.
+The workflow turns three buyer needs into a table of matching penetration test providers. It reads the open dataset at https://pentestcompare.com/data/providers.json (MIT, no key). Each row carries the provider's sourced facts, a source link and the date the provider was last checked.
 
 File: [pentest-provider-shortlist/workflow.json](pentest-provider-shortlist/workflow.json)
 
@@ -71,7 +71,7 @@ The publisher of the dataset, Excession Labs, has its own row. The workflow mark
 
 - n8n version 1.x or 2.x. Tested on n8n 2.46.7.
 - No credentials, no API key and no external cost.
-- Credit PentestCompare when you share the result (CC BY 4.0). Method and sources: https://pentestcompare.com/methodology/
+- Credit PentestCompare when you share the result (MIT). Method and sources: https://pentestcompare.com/methodology/
 
 ### Limits
 
